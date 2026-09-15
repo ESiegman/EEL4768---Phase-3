@@ -9,7 +9,8 @@
 // NOTE: This can be implemented either by silently discarding writesto
 // address 5'd0, or by muxing the output to zero when reading from that
 // address.
-module rf #(
+module rf #
+(
     // When this parameter is set to 1, "RF bypass" mode is enabled. This
     // allows data at the write port to be observed at the read ports
     // immediately without having to wait for the next clock edge. This is
@@ -18,7 +19,9 @@ module rf #(
     // to implement and test both modes. In phase 4, you will disable this
     // parameter, before enabling it in phase 6.
     parameter BYPASS_EN = 0
-) (
+) 
+
+(
     // Global clock.
     input  wire        i_clk,
     // Synchronous active-high reset.
@@ -44,12 +47,57 @@ module rf #(
     // file should remain unchanged at the clock edge.
     //
     // Write register enable, address [0, 31] and input data.
-    // input  wire        i_rd_wen, remve this signal
+    input  wire        i_rd_wen,
     input  wire [ 4:0] i_rd_waddr,
     input  wire [31:0] i_rd_wdata
 );
     // Your implementation goes under here
     // ------------------------------------
+    
+reg  [31:0] regs [0:31];
+
+genvar i;
+generate
+    for (i = 1; i < 32; i = i + 1) begin : g_regs
+    always @(posedge i_clk)
+    begin
+    //reset is checked first
+        if (i_rst)
+        //resets all registers to 0.
+        regs[i] <= 32'd0;
+        //this condition passes if write enable is on and the write
+        else if (i_rd_wen && (i_rd_waddr == i))
+        //when neither of the conditions are met, the register holds the value
+        regs[i] <= i_rd_wdata;
+    end
+end
+endgenerate
+
+//rsX_stored is a 32 bit value. If the address on the read address is 0, then its 0
+//otherwise, it is the whatever data is stored inside the array at the address
+wire [31:0] rs1_stored = (i_rs1_raddr == 5'd0) ? 32'd0 : regs[i_rs1_raddr];
+wire [31:0] rs2_stored = (i_rs2_raddr == 5'd0) ? 32'd0 : regs[i_rs2_raddr];
+
+generate
+if (BYPASS_EN != 0)
+begin : g_bypass
+    wire rs1_byp = i_rd_wen && (i_rs1_raddr == i_rd_waddr) && (i_rs1_raddr != 5'd0);
+    wire rs2_byp = i_rd_wen && (i_rs2_raddr == i_rd_waddr) && (i_rs2_raddr != 5'd0);
+    assign o_rs1_rdata = rs1_byp ? i_rd_wdata : rs1_stored;
+    assign o_rs2_rdata = rs2_byp ? i_rd_wdata : rs2_stored;
+end
+else 
+begin : g_no_bypass
+    assign o_rs1_rdata = rs1_stored;
+    assign o_rs2_rdata = rs2_stored;
+end
+endgenerate
+    
+    
+    
+    
+    
+    
 
 endmodule
 
