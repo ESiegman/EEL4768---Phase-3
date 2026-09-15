@@ -27,9 +27,21 @@ if ! command -v iverilog >/dev/null 2>&1; then
     exit 1
 fi
 
-# The five phase-3 modules. Each is graded by its own <name>_tb.v, which you
-# write yourself -- see README.md and phase 2's example/opmux_tb.v.
-MODULES=(alu imm rf decoder hart)
+# The phase-3 checks. Each is graded by its own <name>_tb.v, which you write
+# yourself -- see README.md and phase 2's example/opmux_tb.v. rf is checked
+# twice, once per BYPASS_EN setting, against the same rf.v -- see
+# rf_bypass_tb.v/rf_no_bypass_tb.v (the official phase_2_update testbenches,
+# matching the no-wen rf interface phase_3 also uses).
+MODULES=(alu imm rf_bypass rf_no_bypass decoder hart)
+
+# Most checks share a name with the .v file they test; rf's two checks both
+# target rf.v. No associative arrays on purpose -- macOS ships bash 3.2.
+dut_for() {
+    case "$1" in
+        rf_bypass | rf_no_bypass) echo "rf" ;;
+        *) echo "$1" ;;
+    esac
+}
 
 # Every non-testbench .v file at the repo root is a potential dependency
 # (hart instantiates alu/rf/decoder, decoder instantiates imm), so every
@@ -42,11 +54,12 @@ done < <(find "${SUBMISSION_DIR}" -maxdepth 1 -name '*.v' ! -name '*_tb.v' | sor
 overall_status=0
 
 for name in "${MODULES[@]}"; do
-    dut="${SUBMISSION_DIR}/${name}.v"
+    dut_name="$(dut_for "${name}")"
+    dut="${SUBMISSION_DIR}/${dut_name}.v"
     tb="${SUBMISSION_DIR}/${name}_tb.v"
 
     if [[ ! -f "${dut}" ]]; then
-        echo "SKIP Verilog: ${name}  --  ${name}.v not found" >> "${SUMMARY_FILE}"
+        echo "SKIP Verilog: ${name}  --  ${dut_name}.v not found" >> "${SUMMARY_FILE}"
         continue
     fi
     if [[ ! -f "${tb}" ]]; then
