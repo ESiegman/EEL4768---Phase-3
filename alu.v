@@ -151,7 +151,7 @@ module alu (
             3'b000: result = add_sub_result;
             3'b001: result = sll_result;
             3'b010: result = {31'b0, o_slt};
-            3'b011: result = {31'b0, o_slt};
+            3'b011: result = {31'b0, unsigned_less};
             3'b100: result = i_op1 ^ i_op2;
             3'b101: result = right_shift_result;
             3'b110: result = i_op1 | i_op2;
