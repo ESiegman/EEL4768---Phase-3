@@ -41,13 +41,13 @@ module rf #
     // Register read port 2, with input address [0, 31] and output data.
     input  wire [ 4:0] i_rs2_raddr,
     output wire [31:0] o_rs2_rdata,
-    // The register write port is synchronous. When write is enabled, the
-    // data at the write port will be written to the specified register
-    // at the next clock edge. When the writen enable is low, the register
-    // file should remain unchanged at the clock edge.
+    
+    // The register write port is synchronous. with no write enable,
+    // a write to any adress other than 5'd0 happens at the next
+    // clock edge.
+    // A write to 5'd0 is discarded, so x0 stays zero.
     //
     // Write register enable, address [0, 31] and input data.
-    input  wire        i_rd_wen,
     input  wire [ 4:0] i_rd_waddr,
     input  wire [31:0] i_rd_wdata
 );
@@ -66,6 +66,9 @@ generate
         //resets all registers to 0.
         regs[i] <= 32'd0;
         //this condition passes if write enable is on and the write
+        //Phase 3 Change:
+        // (i_rd_wen && (i_rd_waddr == i)) -> (i_rd_waddr == i)
+        // with no more write enable must delete from here too.
         else if (i_rd_wen && (i_rd_waddr == i))
         //when neither of the conditions are met, the register holds the value
         regs[i] <= i_rd_wdata;
@@ -81,8 +84,10 @@ wire [31:0] rs2_stored = (i_rs2_raddr == 5'd0) ? 32'd0 : regs[i_rs2_raddr];
 generate
 if (BYPASS_EN != 0)
 begin : g_bypass
-    wire rs1_byp = i_rd_wen && (i_rs1_raddr == i_rd_waddr) && (i_rs1_raddr != 5'd0);
-    wire rs2_byp = i_rd_wen && (i_rs2_raddr == i_rd_waddr) && (i_rs2_raddr != 5'd0);
+    //Phase 3 Changes:
+    // * removed i_rd_wen from rs1_byp and rs2_byp
+    wire rs1_byp = (i_rs1_raddr == i_rd_waddr) && (i_rs1_raddr != 5'd0);
+    wire rs2_byp = (i_rs2_raddr == i_rd_waddr) && (i_rs2_raddr != 5'd0);
     assign o_rs1_rdata = rs1_byp ? i_rd_wdata : rs1_stored;
     assign o_rs2_rdata = rs2_byp ? i_rd_wdata : rs2_stored;
 end
@@ -92,13 +97,6 @@ begin : g_no_bypass
     assign o_rs2_rdata = rs2_stored;
 end
 endgenerate
-    
-    
-    
-    
-    
-    
-
 endmodule
 
 `default_nettype wire
