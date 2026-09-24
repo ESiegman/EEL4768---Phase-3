@@ -211,8 +211,6 @@ module hart #(
       .o_rs1_rdata(rs1_data),
       .i_rs2_raddr(rs2_raddr),
       .o_rs2_rdata(rs2_data),
-      // TODO: remove once the write enable from rf is dropped
-      .i_rd_wen   (1'b1),
       .i_rd_waddr (rd_waddr),
       .i_rd_wdata (rd_wdata)
   );
