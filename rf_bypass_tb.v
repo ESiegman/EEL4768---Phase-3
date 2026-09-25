@@ -8,6 +8,7 @@ module rf_bypass_tb();
     reg [4:0] rd_waddr;
     reg [31:0] rd_wdata;
     integer i;
+    integer errors;
 
     rf #(1) dut (
         .i_clk(clk),
@@ -21,6 +22,7 @@ module rf_bypass_tb();
     );
 
     initial begin
+        errors = 0;
         clk = 0;
         rst = 1;
         rs1_raddr = 5'b0;
@@ -40,7 +42,7 @@ module rf_bypass_tb();
         @(negedge clk);
         rd_waddr = 5'b00000;
         @(posedge clk);
-        if (rs1_rdata !== 32'b0) $display("TEST FAILED: Write to x0 should not update register");
+        if (rs1_rdata !== 32'b0) begin errors = errors + 1; $display("TEST FAILED: Write to x0 should not update register"); end
 
         // write to each of the other registers and read them back
         for (i = 1; i < 32; i = i + 1) begin
@@ -53,7 +55,7 @@ module rf_bypass_tb();
             rs1_raddr = i[4:0];
             @(posedge clk);
             if (rs1_rdata !== {12'b0, i[4:0], i[4:0], i[4:0], i[4:0]}) 
-                $display("TEST FAILED: RS1 read back %08h for x%0d, expected %08h", rs1_rdata, i, {12'b0, i[4:0], i[4:0], i[4:0], i[4:0]});
+                begin errors = errors + 1; $display("TEST FAILED: RS1 read back %08h for x%0d, expected %08h", rs1_rdata, i, {12'b0, i[4:0], i[4:0], i[4:0], i[4:0]}); end
                 
             @(posedge clk);
             @(negedge clk);
@@ -64,8 +66,10 @@ module rf_bypass_tb();
             rs2_raddr = i[4:0];
             @(posedge clk);
             if (rs2_rdata !== {12'b0, i[4:0], i[4:0], i[4:0], i[4:0]}) 
-                $display("TEST FAILED: RS2 read back %08h for x%0d, expected %08h", rs2_rdata, i, {12'b0, i[4:0], i[4:0], i[4:0], i[4:0]});
+                begin errors = errors + 1; $display("TEST FAILED: RS2 read back %08h for x%0d, expected %08h", rs2_rdata, i, {12'b0, i[4:0], i[4:0], i[4:0], i[4:0]}); end
         end
+        if (errors == 0) $display("ALL TESTS PASSED");
+        else             $display("TEST FAILED");
         $finish;
     end
 

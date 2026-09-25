@@ -251,18 +251,28 @@ module hart #(
 
   wire mem_ren = dec_dmem_ren & ~trap;
   wire mem_wen = dec_dmem_wen & ~trap;
+  wire [3:0] byte_mask = (byte_offset == 2'd0) ? 4'b0001 :
+                         (byte_offset == 2'd1) ? 4'b0010 :
+                         (byte_offset == 2'd2) ? 4'b0100 :
+                                                 4'b1000;
   wire [3:0] access_mask = dec_dmem_memw ? 4'b1111 :
                            dec_dmem_memh ? (byte_offset[1] ? 4'b1100 : 4'b0011) :
-                           dec_dmem_memb ? (4'b0001 << byte_offset) :
+                           dec_dmem_memb ? byte_mask :
                                            4'b0000;
 
   assign o_dmem_addr  = {alu_result[31:2], 2'b00};
   assign o_dmem_ren   = mem_ren;
   assign o_dmem_wen   = mem_wen;
   assign o_dmem_mask  = (mem_ren | mem_wen) ? access_mask : 4'b0000;
-  assign o_dmem_wdata = rs2_data << {byte_offset, 3'b000};
+  assign o_dmem_wdata = (byte_offset == 2'd0) ? rs2_data :
+                        (byte_offset == 2'd1) ? {rs2_data[23:0], 8'b0} :
+                        (byte_offset == 2'd2) ? {rs2_data[15:0], 16'b0} :
+                                                {rs2_data[7:0], 24'b0};
 
-  wire [31:0] load_shifted = i_dmem_rdata >> {byte_offset, 3'b000};
+  wire [31:0] load_shifted = (byte_offset == 2'd0) ? i_dmem_rdata :
+                             (byte_offset == 2'd1) ? {8'b0, i_dmem_rdata[31:8]} :
+                             (byte_offset == 2'd2) ? {16'b0, i_dmem_rdata[31:16]} :
+                                                     {24'b0, i_dmem_rdata[31:24]};
   wire [31:0] load_data =
       dec_dmem_memb ? {{24{~dec_dmem_memu & load_shifted[7]}},  load_shifted[7:0]} :
       dec_dmem_memh ? {{16{~dec_dmem_memu & load_shifted[15]}}, load_shifted[15:0]} :

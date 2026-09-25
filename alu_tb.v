@@ -1,9 +1,9 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-// i_unsigned selects signed vs unsigned for o_result as well as o_slt, and
-// i_opsel 010 and 011 both mean set less than. this contradicts the port
-// comment in alu.v, which says i_unsigned is only used for branches
+// i_unsigned selects signed vs unsigned for o_slt and for the opsel 010
+// result. opsel 011 is set less than unsigned per the alu.v port comment,
+// so its result is always an unsigned compare regardless of i_unsigned
 module alu_tb;
 
     reg  [ 2:0] opsel;
@@ -105,7 +105,7 @@ module alu_tb;
     // reference model, written from the spec rather than from alu.v, which
     // has to build the same operations out of constant shifts and gates
 
-    // signedness comes from i_unsigned, never from i_opsel
+    // signedness comes from i_unsigned, except opsel 011 which is always unsigned
     function model_lt;
         input        m_unsigned;
         input [31:0] a;
@@ -133,8 +133,8 @@ module alu_tb;
             case (m_opsel)
                 OP_ADD:  value = m_sub ? (m_op1 - m_op2) : (m_op1 + m_op2);
                 OP_SLL:  value = m_op1 << m_op2[4:0];
-                OP_SLT,
-                OP_SLTU: value = model_lt(m_unsigned, m_op1, m_op2) ? 32'd1 : 32'd0;
+                OP_SLT:  value = model_lt(m_unsigned, m_op1, m_op2) ? 32'd1 : 32'd0;
+                OP_SLTU: value = model_lt(1'b1,       m_op1, m_op2) ? 32'd1 : 32'd0;
                 OP_XOR:  value = m_op1 ^ m_op2;
                 OP_SRL:  if (m_arith) value = signed_op1 >>> m_op2[4:0];
                          else         value = m_op1 >> m_op2[4:0];
@@ -205,9 +205,9 @@ module alu_tb;
         check("sll: i_arith ignored on left shifts",
                                                OP_SLL, 1'b0,1'b0,1'b1, 32'h8000_0000, 32'd1,         32'd0,         1'b0,1'b1);
 
-        // set less than, i_unsigned picks signed vs unsigned for the result
-        // as well as o_slt. opsel 010 and 011 behave alike, so all four
-        // (opsel, i_unsigned) pairings are exercised
+        // set less than. opsel 010's result follows i_unsigned, opsel 011's
+        // result is always unsigned, and o_slt always follows i_unsigned.
+        // all four (opsel, i_unsigned) pairings are exercised
         $display("--- set less than, signed (i_unsigned = 0) ---");
         check("slt: 7 < 9",                    OP_SLT, 1'b0,1'b0,1'b0, 32'd7,         32'd9,         32'd1,         1'b0,1'b1);
         check("slt: 9 < 7 is false",           OP_SLT, 1'b0,1'b0,1'b0, 32'd9,         32'd7,         32'd0,         1'b0,1'b0);
@@ -217,11 +217,12 @@ module alu_tb;
                                                OP_SLT, 1'b0,1'b0,1'b0, 32'h8000_0000, 32'd0,         32'd1,         1'b0,1'b1);
         check("slt: 0x80000000 < 0x7fffffff",  OP_SLT, 1'b0,1'b0,1'b0, 32'h8000_0000, 32'h7fff_ffff, 32'd1,         1'b0,1'b1);
         check("slt: 0x80000000 < -1",          OP_SLT, 1'b0,1'b0,1'b0, 32'h8000_0000, 32'hffff_ffff, 32'd1,         1'b0,1'b1);
-        // opsel 011 with i_unsigned deasserted still compares signed
-        check("slt: opsel 011 with i_unsigned low is signed",
-                                               OP_SLTU,1'b0,1'b0,1'b0, 32'hffff_ffff, 32'd1,         32'd1,         1'b0,1'b1);
-        check("slt: opsel 011 low, 0x80000000 < 0x7fffffff",
-                                               OP_SLTU,1'b0,1'b0,1'b0, 32'h8000_0000, 32'h7fff_ffff, 32'd1,         1'b0,1'b1);
+        // opsel 011 with i_unsigned deasserted: result is still unsigned,
+        // but o_slt follows i_unsigned and compares signed
+        check("slt: opsel 011 with i_unsigned low, result is unsigned",
+                                               OP_SLTU,1'b0,1'b0,1'b0, 32'hffff_ffff, 32'd1,         32'd0,         1'b0,1'b1);
+        check("slt: opsel 011 low, 0x80000000 < 0x7fffffff result false",
+                                               OP_SLTU,1'b0,1'b0,1'b0, 32'h8000_0000, 32'h7fff_ffff, 32'd0,         1'b0,1'b1);
 
         $display("--- set less than, unsigned (i_unsigned = 1) ---");
         check("sltu: 7 < 9",                   OP_SLTU,1'b0,1'b1,1'b0, 32'd7,         32'd9,         32'd1,         1'b0,1'b1);
