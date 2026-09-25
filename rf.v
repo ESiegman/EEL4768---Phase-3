@@ -69,7 +69,7 @@ generate
         //Phase 3 Change:
         // (i_rd_wen && (i_rd_waddr == i)) -> (i_rd_waddr == i)
         // with no more write enable must delete from here too.
-        else if (i_rd_wen && (i_rd_waddr == i))
+        else if (i_rd_waddr == i)   // was: (i_rd_wen && (i_rd_waddr == i))
         //when neither of the conditions are met, the register holds the value
         regs[i] <= i_rd_wdata;
     end
